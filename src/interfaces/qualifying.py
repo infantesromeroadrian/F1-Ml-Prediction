@@ -3,8 +3,8 @@ import time
 
 import arcade
 import numpy as np
-from src.f1_data import FPS, get_driver_quali_telemetry
-from src.lib.time import format_time
+from src.f1_data.processors import FPS, get_driver_quali_telemetry
+from src.utils.time import format_time
 from src.ui_components import (
     LapTimeLeaderboardComponent,
     LegendComponent,

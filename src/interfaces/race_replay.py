@@ -2,7 +2,7 @@ import os
 
 import arcade
 import numpy as np
-from src.f1_data import FPS
+from src.f1_data.processors import FPS
 from src.ui_components import (
     DriverInfoComponent,
     LeaderboardComponent,

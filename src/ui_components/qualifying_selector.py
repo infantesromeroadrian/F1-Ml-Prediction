@@ -3,7 +3,7 @@
 from typing import Any
 
 import arcade
-from src.lib.time import format_time
+from src.utils.time import format_time
 from src.ui_components.base import BaseComponent
 
 

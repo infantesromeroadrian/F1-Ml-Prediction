@@ -11,8 +11,8 @@ import pandas as pd
 from fastf1.core import Session
 from src.f1_data.cache import load_cached_data, save_cached_data
 from src.f1_data.loaders import get_driver_colors
-from src.lib.time import parse_time_string
-from src.lib.tyres import get_tyre_compound_int
+from src.utils.time import parse_time_string
+from src.utils.tyres import get_tyre_compound_int
 
 logger = logging.getLogger(__name__)
 

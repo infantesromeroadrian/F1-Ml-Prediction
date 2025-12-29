@@ -2,7 +2,7 @@ import os
 
 import arcade
 import numpy as np
-from src.lib.time import format_time
+from src.utils.time import format_time
 
 
 def _format_wind_direction(degrees: float | None) -> str:
