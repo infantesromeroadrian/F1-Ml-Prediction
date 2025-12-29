@@ -58,6 +58,7 @@ logs/
 .ipynb_checkpoints/
 notebooks/*.ipynb
 !notebooks/explore_dataset.ipynb
+!notebooks/train_production_model.ipynb
 
 # ═══════════════════════════════════════════════════════════════
 # IDE & OS
