@@ -21,6 +21,7 @@ from src.ml.features import (
     add_feature_columns,
     calculate_historical_stats,
 )
+from src.ml.validation import validate_ml_data
 
 logger = logging.getLogger(__name__)
 
@@ -644,6 +645,21 @@ class F1PredictionEngine:
 
         # Prepare final feature set
         X = self._prepare_final_features(driver_features)
+
+        # 🔒 CRITICAL: Validate no data leakage before prediction
+        try:
+            year = race_session.event["EventDate"].year
+            round_number = race_session.event["RoundNumber"]
+            validate_ml_data(
+                X,
+                current_year=year,
+                current_round=round_number,
+                strict=True,  # Fail hard if leakage detected
+            )
+            logger.info("✅ Data validation passed - no leakage detected")
+        except Exception as e:
+            logger.error(f"❌ Data validation failed: {e}")
+            raise
 
         # Make predictions
         predictions = driver_features[["driver_code", "driver_number", "constructor"]].copy()
