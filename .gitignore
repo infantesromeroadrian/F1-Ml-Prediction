@@ -1,0 +1,88 @@
+# ═══════════════════════════════════════════════════════════════
+# Python Virtual Environments
+# ═══════════════════════════════════════════════════════════════
+venv/
+.venv/
+*-venv/
+*.venv/
+f1-prediction-venv/
+ENV/
+env/
+
+# ═══════════════════════════════════════════════════════════════
+# Python Build & Cache
+# ═══════════════════════════════════════════════════════════════
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ═══════════════════════════════════════════════════════════════
+# ML Models & Data - Use DVC for versioning
+# ═══════════════════════════════════════════════════════════════
+models/
+*.pkl
+*.h5
+*.pt
+*.pth
+*.onnx
+*.safetensors
+checkpoints/
+
+# Data directories
+data/raw/
+data/processed/*.csv
+!data/processed/.gitkeep
+!data/raw/.gitkeep
+
+# ═══════════════════════════════════════════════════════════════
+# Application Specific
+# ═══════════════════════════════════════════════════════════════
+.fastf1-cache/
+computed_data/
+output_animation.mp4
+still_frame.png
+logs/
+*.log
+
+# ═══════════════════════════════════════════════════════════════
+# Notebooks
+# ═══════════════════════════════════════════════════════════════
+.ipynb_checkpoints/
+notebooks/*.ipynb
+!notebooks/explore_dataset.ipynb
+
+# ═══════════════════════════════════════════════════════════════
+# IDE & OS
+# ═══════════════════════════════════════════════════════════════
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ═══════════════════════════════════════════════════════════════
+# Secrets & Environment
+# ═══════════════════════════════════════════════════════════════
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ═══════════════════════════════════════════════════════════════
+# Coverage & Testing
+# ═══════════════════════════════════════════════════════════════
+.coverage
+htmlcov/
+.tox/
+.hypothesis/

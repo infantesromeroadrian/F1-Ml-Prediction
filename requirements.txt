@@ -1,0 +1,12 @@
+fastf1
+pandas
+matplotlib
+numpy
+arcade
+pyglet
+seaborn
+ipykernel
+scikit-learn
+scipy
+imbalanced-learn
+xgboost
