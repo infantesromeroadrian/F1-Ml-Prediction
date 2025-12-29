@@ -1,5 +1,6 @@
 """Machine Learning prediction module for F1 race predictions."""
 
+import hashlib
 import json
 import logging
 import os
@@ -509,8 +510,13 @@ class F1PredictionEngine:
         for col in high_cardinality:
             if col in result.columns:
                 encoded_col = f"{col}_encoded"
-                # Use simple hash-based encoding for consistency
-                result[encoded_col] = result[col].astype(str).apply(lambda x: hash(x) % 1000)
+                # Use deterministic hash (MD5) for reproducible encoding across sessions
+                # Python's built-in hash() is NOT deterministic between runs
+                result[encoded_col] = (
+                    result[col]
+                    .astype(str)
+                    .apply(lambda x: int(hashlib.md5(x.encode()).hexdigest(), 16) % 1000)
+                )
 
         # Low-cardinality features: One-Hot Encoding (we'll create binary columns)
         low_cardinality = [
