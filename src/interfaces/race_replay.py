@@ -13,6 +13,8 @@ from src.ui_components import (
     build_track_from_example_lap,
     extract_race_events,
 )
+from src.ui_components.ml_predictions_panel import MLPredictionsPanel
+from src.ui_components.team_colors import get_team_color, get_driver_color
 
 SCREEN_WIDTH = 1920
 SCREEN_HEIGHT = 1200
@@ -29,6 +31,7 @@ class F1RaceReplayWindow(arcade.Window):
         title,
         playback_speed=1.0,
         driver_colors=None,
+        driver_teams=None,
         circuit_rotation=0.0,
         left_ui_margin=340,
         right_ui_margin=260,
@@ -45,6 +48,7 @@ class F1RaceReplayWindow(arcade.Window):
         self.drivers = list(drivers)
         self.playback_speed = playback_speed
         self.driver_colors = driver_colors or {}
+        self.driver_teams = driver_teams or {}  # {driver_code: team_name}
         self.frame_index = 0.0  # use float for fractional-frame accumulation
         self.paused = False
         self.total_laps = total_laps
@@ -63,6 +67,11 @@ class F1RaceReplayWindow(arcade.Window):
         self.left_ui_margin = left_ui_margin
         self.right_ui_margin = right_ui_margin
         self.toggle_drs_zones = True
+
+        # Overtake animation tracking
+        self.previous_positions = {}  # {driver_code: position}
+        self.overtake_flash = {}  # {driver_code: flash_timer}
+        self.overtake_flash_duration = 0.8  # seconds
         # UI components
         leaderboard_x = max(20, self.width - self.right_ui_margin + 12)
         self.leaderboard_comp = LeaderboardComponent(
@@ -87,6 +96,21 @@ class F1RaceReplayWindow(arcade.Window):
         self.race_controls_comp = RaceControlsComponent(
             x=self.width // 2, y=100, visible=visible_hud
         )
+
+        # ML Predictions Panel (right side, below leaderboard)
+        self.ml_panel = None
+        if ml_predictions is not None and visible_hud:
+            # Convert DataFrame to dict format for panel
+            predictions_dict = self._convert_ml_predictions_to_dict(ml_predictions)
+            ml_panel_x = max(20, self.width - 380)  # Right side with margin
+            ml_panel_y = self.height - 420  # Below leaderboard
+            self.ml_panel = MLPredictionsPanel(
+                x=ml_panel_x,
+                y=ml_panel_y,
+                width=350,
+                height=500,
+                predictions=predictions_dict,
+            )
 
         # Extract race events for the progress bar
         race_events = extract_race_events(frames, track_statuses, total_laps or 0)
@@ -382,12 +406,45 @@ class F1RaceReplayWindow(arcade.Window):
                 if len(drs_outer_points) > 1:
                     arcade.draw_line_strip(drs_outer_points, drs_color, 6)
 
-        # 3. Draw Cars
+        # 3. Draw Cars with enhanced visuals
         frame = self.frames[idx]
         for code, pos in frame["drivers"].items():
             sx, sy = self.world_to_screen(pos["x"], pos["y"])
-            color = self.driver_colors.get(code, arcade.color.WHITE)
+
+            # Get team name from mapping
+            team_name = self.driver_teams.get(code)
+
+            # Use new team color system with state support
+            is_flashing = code in self.overtake_flash
+            color_state = "flash" if is_flashing else "normal"
+
+            if team_name:
+                color = get_driver_color(code, team_name, state=color_state)
+            else:
+                # Fallback to legacy color
+                color = self.driver_colors.get(code, arcade.color.WHITE)
+
+            # DRS active check
+            drs_val = pos.get("drs", 0)
+            is_drs_active = drs_val and int(drs_val) >= 10
+
+            # Draw DRS halo (outer glow when DRS active)
+            if is_drs_active:
+                # Green glow for DRS
+                arcade.draw_circle_filled(sx, sy, 10, (*arcade.color.GREEN, 80))
+                arcade.draw_circle_outline(sx, sy, 11, arcade.color.GREEN, 2)
+
+            # Draw car body (rectangle oriented in direction of travel)
+            # Try to estimate direction from velocity or use previous position
+            car_length = 8
+            car_width = 5
+
+            # Simple direction estimation (could be improved with velocity data)
             arcade.draw_circle_filled(sx, sy, 6, color)
+
+            # Overtake flash effect (white outline)
+            if is_flashing:
+                arcade.draw_circle_outline(sx, sy, 9, arcade.color.WHITE, 3)
 
         # --- UI ELEMENTS (Dynamic Positioning) ---
 
@@ -483,6 +540,20 @@ class F1RaceReplayWindow(arcade.Window):
             progress_m = driver_progress.get(code, float(pos.get("dist", 0.0)))
             driver_list.append((code, color, pos, progress_m))
         driver_list.sort(key=lambda x: x[3], reverse=True)
+
+        # Detect position changes for overtake animations
+        current_positions = {driver_list[i][0]: i + 1 for i in range(len(driver_list))}
+
+        if self.previous_positions:
+            for code, current_pos in current_positions.items():
+                previous_pos = self.previous_positions.get(code)
+                if previous_pos is not None and current_pos < previous_pos:
+                    # Driver gained position(s) - trigger flash
+                    self.overtake_flash[code] = self.overtake_flash_duration
+
+        # Update previous positions for next frame
+        self.previous_positions = current_positions.copy()
+
         self.leaderboard_comp.set_entries(driver_list)
         # Set ML predictions if available
         if self.ml_predictions is not None:
@@ -493,6 +564,10 @@ class F1RaceReplayWindow(arcade.Window):
 
         # Controls Legend - Bottom Left (keeps small offset from left UI edge)
         self.legend_comp.draw(self)
+
+        # ML Predictions Panel (if available)
+        if self.ml_panel is not None:
+            self.ml_panel.draw()
 
         # Selected driver info component
         self.driver_info_comp.draw(self)
@@ -509,6 +584,17 @@ class F1RaceReplayWindow(arcade.Window):
     def on_update(self, delta_time: float):
         # Update race controls component (for flash animations)
         self.race_controls_comp.on_update(delta_time)
+
+        # Update overtake flash timers
+        drivers_to_remove = []
+        for code, timer in self.overtake_flash.items():
+            self.overtake_flash[code] = timer - delta_time
+            if self.overtake_flash[code] <= 0:
+                drivers_to_remove.append(code)
+
+        for code in drivers_to_remove:
+            del self.overtake_flash[code]
+
         if self.paused:
             return
         self.frame_index += delta_time * FPS * self.playback_speed
@@ -567,3 +653,33 @@ class F1RaceReplayWindow(arcade.Window):
         """Handle mouse motion for hover effects on progress bar and controls."""
         self.progress_bar_comp.on_mouse_motion(self, x, y, dx, dy)
         self.race_controls_comp.on_mouse_motion(self, x, y, dx, dy)
+
+    def _convert_ml_predictions_to_dict(self, ml_predictions):
+        """
+        Convert ML predictions DataFrame to dictionary format for MLPredictionsPanel.
+
+        Args:
+            ml_predictions: DataFrame with columns [driver_code, win_prob, expected_position, expected_points]
+
+        Returns:
+            Dict with structure: {driver_code: {win_prob, expected_position, expected_points}}
+        """
+        if ml_predictions is None:
+            return {}
+
+        predictions_dict = {}
+        for _, row in ml_predictions.iterrows():
+            driver_code = row.get("driver_code", "")
+            if not driver_code:
+                continue
+
+            predictions_dict[driver_code] = {
+                "win_prob": row.get("win_prob", 0.0),
+                "expected_position": row.get("expected_position", 20.0),
+                "expected_points": row.get("expected_points", 0.0),
+                "position_confidence": row.get(
+                    "position_std", 0.0
+                ),  # Standard deviation as confidence
+            }
+
+        return predictions_dict

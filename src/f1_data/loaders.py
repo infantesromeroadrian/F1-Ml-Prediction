@@ -100,6 +100,32 @@ def get_circuit_rotation(session: Session) -> float:
         return 0.0
 
 
+def get_driver_team_mapping(session: Session) -> dict[str, str]:
+    """
+    Get driver code to team name mapping.
+
+    Args:
+        session: FastF1 session object
+
+    Returns:
+        Dictionary mapping driver codes to team names
+    """
+    team_mapping = {}
+    try:
+        for driver_num in session.drivers:
+            driver_info = session.get_driver(driver_num)
+            code = driver_info.get("Abbreviation", "")
+            team = driver_info.get("TeamName", "")
+            if code and team:
+                team_mapping[code] = team
+
+        logger.debug(f"🐞 Loaded team mapping for {len(team_mapping)} drivers")
+        return team_mapping
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to get driver team mapping: {e}")
+        return {}
+
+
 def list_rounds(year: int) -> None:
     """
     List all F1 rounds for a given year.

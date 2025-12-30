@@ -6,6 +6,7 @@ import logging
 from src.f1_data.loaders import (
     enable_cache,
     get_circuit_rotation,
+    get_driver_team_mapping,
     list_rounds,
     list_sprints,
     load_session,
@@ -105,8 +106,9 @@ def main(
 
         drivers = session.drivers
 
-        # Get circuit rotation
+        # Get circuit rotation and team mapping
         circuit_rotation = get_circuit_rotation(session)
+        driver_teams = get_driver_team_mapping(session)
 
         # Load ML prediction engine and make predictions
         ml_predictions = None
@@ -131,6 +133,7 @@ def main(
             drivers=drivers,
             playback_speed=playback_speed,
             driver_colors=race_telemetry["driver_colors"],
+            driver_teams=driver_teams,
             title=f"{session.event['EventName']} - {'Sprint' if session_type == 'S' else 'Race'}",
             total_laps=race_telemetry["total_laps"],
             circuit_rotation=circuit_rotation,
