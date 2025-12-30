@@ -26,11 +26,11 @@ from src.ml.validation import validate_ml_data
 logger = logging.getLogger(__name__)
 
 # Default model paths (relative to project root)
-# Try models/ first, then notebooks/models/ as fallback
-DEFAULT_MODELS_DIR = Path("models")
-DEFAULT_MODELS_DIR_FALLBACK = Path("notebooks/models")
-DEFAULT_MODEL_INFO_FILE = "optimized_models_info_20251225_000229.json"
-DEFAULT_FEATURE_NAMES_FILE = "enhanced_feature_names_20251225_000229.json"
+# Uses versioned model structure: models/latest/ -> models/v1.x.x/
+DEFAULT_MODELS_DIR = Path("models/latest")  # Symlink to current version
+DEFAULT_MODELS_DIR_FALLBACK = Path("models/v1.1.0")  # Fallback to v1.1.0
+DEFAULT_MODEL_INFO_FILE = "metrics.json"  # New standardized name
+DEFAULT_FEATURE_NAMES_FILE = "features.json"  # New standardized name
 
 
 class F1PredictionEngine:
@@ -84,6 +84,9 @@ class F1PredictionEngine:
         """
         Load all ML models from disk.
 
+        Supports both legacy format (with paths in metrics.json) and new format
+        (standardized filenames: classifier_winner.pkl, regressor_position.pkl, etc.)
+
         Returns:
             True if all models loaded successfully, False otherwise
         """
@@ -99,6 +102,7 @@ class F1PredictionEngine:
                 self.model_info = json.load(f)
 
             logger.info(f"ℹ️ Loaded model info from {model_info_path}")
+            logger.info(f"   Version: {self.model_info.get('version', 'unknown')}")
 
             # Load feature names
             feature_names_path = self.models_dir / self.feature_names_file
@@ -110,35 +114,44 @@ class F1PredictionEngine:
                 logger.warning(f"⚠️ Feature names file not found: {feature_names_path}")
                 return False
 
-            # Helper function to resolve model path (handles paths with or without "models/" prefix)
-            def resolve_model_path(path_str: str) -> Path:
-                """Resolve model path, handling both absolute and relative paths."""
-                path = Path(path_str)
-                # If path starts with "models/", extract just the filename
-                if path.parts[0] == "models" and len(path.parts) > 1:
-                    filename = path.name
-                # If it's just a filename, use it directly
-                elif len(path.parts) == 1:
-                    filename = path
-                else:
-                    filename = path.name
+            # Determine model file paths (new standardized format vs legacy)
+            # NEW FORMAT (v1.1.0+): classifier_winner.pkl, regressor_position.pkl, regressor_points.pkl
+            # LEGACY FORMAT: paths specified in model_info dict
 
-                # Try in current models_dir first
-                candidate = self.models_dir / filename
-                if candidate.exists():
+            if "classification" in self.model_info:
+                # Legacy format with paths in model_info
+                def resolve_model_path(path_str: str) -> Path:
+                    """Resolve model path, handling both absolute and relative paths."""
+                    path = Path(path_str)
+                    if path.parts[0] == "models" and len(path.parts) > 1:
+                        filename = path.name
+                    elif len(path.parts) == 1:
+                        filename = path
+                    else:
+                        filename = path.name
+
+                    candidate = self.models_dir / filename
+                    if candidate.exists():
+                        return candidate
+
+                    if self.models_dir != DEFAULT_MODELS_DIR_FALLBACK:
+                        fallback_candidate = DEFAULT_MODELS_DIR_FALLBACK / filename
+                        if fallback_candidate.exists():
+                            return fallback_candidate
+
                     return candidate
 
-                # Try in fallback directory
-                if self.models_dir != DEFAULT_MODELS_DIR_FALLBACK:
-                    fallback_candidate = DEFAULT_MODELS_DIR_FALLBACK / filename
-                    if fallback_candidate.exists():
-                        return fallback_candidate
-
-                # Return the candidate even if it doesn't exist (will be handled by caller)
-                return candidate
+                classifier_path = resolve_model_path(self.model_info["classification"]["path"])
+                position_path = resolve_model_path(self.model_info["regression_position"]["path"])
+                points_path = resolve_model_path(self.model_info["regression_points"]["path"])
+            else:
+                # New standardized format
+                classifier_path = self.models_dir / "classifier_winner.pkl"
+                position_path = self.models_dir / "regressor_position.pkl"
+                points_path = self.models_dir / "regressor_points.pkl"
+                logger.info("   Using standardized model filenames")
 
             # Load classification model
-            classifier_path = resolve_model_path(self.model_info["classification"]["path"])
             if classifier_path.exists():
                 with open(classifier_path, "rb") as f:
                     self.classifier_model = pickle.load(f)
@@ -148,7 +161,6 @@ class F1PredictionEngine:
                 return False
 
             # Load position regressor
-            position_path = resolve_model_path(self.model_info["regression_position"]["path"])
             if position_path.exists():
                 with open(position_path, "rb") as f:
                     self.position_regressor = pickle.load(f)
@@ -157,7 +169,6 @@ class F1PredictionEngine:
                 logger.warning(f"⚠️ Position regressor not found: {position_path}")
 
             # Load points regressor
-            points_path = resolve_model_path(self.model_info["regression_points"]["path"])
             if points_path.exists():
                 with open(points_path, "rb") as f:
                     self.points_regressor = pickle.load(f)
@@ -168,7 +179,7 @@ class F1PredictionEngine:
             return True
 
         except Exception as e:
-            logger.error(f"❌ Error loading models: {e}")
+            logger.error(f"❌ Error loading models: {e}", exc_info=True)
             return False
 
     def load_historical_data(self, historical_data_path: str | None = None) -> bool:
