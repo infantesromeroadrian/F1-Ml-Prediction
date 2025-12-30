@@ -28,6 +28,7 @@ build/
 # ML Models & Data - Use DVC for versioning
 # ═══════════════════════════════════════════════════════════════
 models/
+!models/README.md
 *.pkl
 *.h5
 *.pt
@@ -39,6 +40,7 @@ checkpoints/
 # Data directories
 data/raw/
 data/processed/*.csv
+data/processed/*.parquet
 !data/processed/.gitkeep
 !data/raw/.gitkeep
 
@@ -66,6 +68,7 @@ notebooks/*.ipynb
 .DS_Store
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
 *~
