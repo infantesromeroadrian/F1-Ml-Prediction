@@ -140,36 +140,70 @@ def main(
 
 
 if __name__ == "__main__":
-    # Get the year and round number from user input
+    # Import interactive selector
+    from src.interfaces.selector import interactive_session_selector, quick_select_latest_race
 
-    if "--year" in sys.argv:
-        year_index = sys.argv.index("--year") + 1
-        year = int(sys.argv[year_index])
-    else:
-        year = 2025  # Default year
-
-    if "--round" in sys.argv:
-        round_index = sys.argv.index("--round") + 1
-        round_number = int(sys.argv[round_index])
-    else:
-        round_number = 12  # Default round number
-
+    # Check for special flags first
     if "--list-rounds" in sys.argv:
-        list_rounds(year)
-    elif "--list-sprints" in sys.argv:
-        list_sprints(year)
+        year_index = (
+            sys.argv.index("--list-rounds") + 1
+            if len(sys.argv) > sys.argv.index("--list-rounds") + 1
+            else None
+        )
+        year_to_list = (
+            int(sys.argv[year_index]) if year_index and sys.argv[year_index].isdigit() else 2024
+        )
+        list_rounds(year_to_list)
+        sys.exit(0)
+
+    if "--list-sprints" in sys.argv:
+        year_index = (
+            sys.argv.index("--list-sprints") + 1
+            if len(sys.argv) > sys.argv.index("--list-sprints") + 1
+            else None
+        )
+        year_to_list = (
+            int(sys.argv[year_index]) if year_index and sys.argv[year_index].isdigit() else 2024
+        )
+        list_sprints(year_to_list)
+        sys.exit(0)
+
+    # Determine selection mode
+    if "--interactive" in sys.argv or len(sys.argv) == 1:
+        # Interactive mode (default if no args)
+        year, round_number, session_type = interactive_session_selector()
+    elif "--latest" in sys.argv:
+        # Quick select latest race
+        year, round_number, session_type = quick_select_latest_race()
     else:
-        playback_speed = 1
+        # CLI argument mode (backwards compatible)
+        if "--year" in sys.argv:
+            year_index = sys.argv.index("--year") + 1
+            year = int(sys.argv[year_index])
+        else:
+            year = 2024  # Changed default to 2024 (more stable data)
 
-    visible_hud = True
-    if "--no-hud" in sys.argv:
-        visible_hud = False
+        if "--round" in sys.argv:
+            round_index = sys.argv.index("--round") + 1
+            round_number = int(sys.argv[round_index])
+        else:
+            round_number = 1  # Default to first round
 
-    # Session type selection
-    session_type = (
-        "SQ"
-        if "--sprint-qualifying" in sys.argv
-        else ("S" if "--sprint" in sys.argv else ("Q" if "--qualifying" in sys.argv else "R"))
-    )
+        # Session type selection
+        session_type = (
+            "SQ"
+            if "--sprint-qualifying" in sys.argv
+            else ("S" if "--sprint" in sys.argv else ("Q" if "--qualifying" in sys.argv else "R"))
+        )
 
+    # Playback speed
+    playback_speed = 1.0
+    if "--speed" in sys.argv:
+        speed_index = sys.argv.index("--speed") + 1
+        playback_speed = float(sys.argv[speed_index])
+
+    # HUD visibility
+    visible_hud = "--no-hud" not in sys.argv
+
+    # Run the replay
     main(year, round_number, playback_speed, session_type=session_type, visible_hud=visible_hud)

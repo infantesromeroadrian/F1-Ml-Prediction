@@ -25,10 +25,21 @@ from src.ml.validation import validate_ml_data
 
 logger = logging.getLogger(__name__)
 
+
 # Default model paths (relative to project root)
-# Uses versioned model structure: models/latest/ -> models/v1.x.x/
-DEFAULT_MODELS_DIR = Path("models/latest")  # Symlink to current version
-DEFAULT_MODELS_DIR_FALLBACK = Path("models/v1.1.0")  # Fallback to v1.1.0
+# Uses versioned model structure based on LATEST_VERSION file
+def _get_latest_model_dir() -> Path:
+    """Get the latest model directory from LATEST_VERSION file."""
+    version_file = Path("models/LATEST_VERSION")
+    if version_file.exists():
+        version = version_file.read_text().strip()
+        return Path(f"models/{version}")
+    # Fallback to v1.2.0 if LATEST_VERSION doesn't exist
+    return Path("models/v1.2.0")
+
+
+DEFAULT_MODELS_DIR = _get_latest_model_dir()  # Load from version file
+DEFAULT_MODELS_DIR_FALLBACK = Path("models/v1.2.0")  # Fallback directory
 DEFAULT_MODEL_INFO_FILE = "metrics.json"  # New standardized name
 DEFAULT_FEATURE_NAMES_FILE = "features.json"  # New standardized name
 
@@ -264,6 +275,13 @@ class F1PredictionEngine:
                 driver_data = driver_data.merge(
                     qualifying_results, on="driver_code", how="left", suffixes=("", "_quali")
                 )
+                # Add grid_position (same as qualifying_position in most cases)
+                # Handle pit lane starts and penalties later if needed
+                driver_data["grid_position"] = driver_data["qualifying_position"].fillna(20)
+            else:
+                # If no qualifying data, assume grid_position = 20 (back of grid)
+                logger.warning("⚠️ No qualifying data available, using default grid positions")
+                driver_data["grid_position"] = 20
 
             # Add weather and circuit info (same for all drivers)
             if weather_data is not None:
